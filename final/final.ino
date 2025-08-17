@@ -1,86 +1,194 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
-#include <AccelStepper.h>
+#include <SoftwareSerial.h>
+#include "DHT.h"
 
-// LCD setup
-LiquidCrystal_I2C lcd(0x27, 20, 4);
+// إعداد شاشة LCD I2C
+LiquidCrystal_I2C lcd(0x27, 16, 2); // عنوان I2C: 0x27، وأبعاد الشاشة: 16x2
 
-// تعريف نوع الموتور: A4988 = DRIVER (1)
-AccelStepper stepper(AccelStepper::DRIVER, 9, 8); // STEP = 9, DIR = 8
+SoftwareSerial UnoSerial(11, 12); // RX=11  TX=12
 
-// تعريف الريلاي
-#define RELAY_1  22
-#define RELAY_2  23
-#define RELAY_3  24
-#define RELAY_4  25
-#define RELAY_5  26
-#define RELAY_6  27
-#define RELAY_7  28
-int relayPins[] = {RELAY_1, RELAY_2, RELAY_3, RELAY_4, RELAY_5, RELAY_6, RELAY_7};
+#define DHTPIN1 3 // Pin connected to first DHT sensor
+#define DHTPIN2 4 // Pin connected to second DHT sensor
+#define DHTTYPE DHT11  // DHT 11
+DHT dht1(DHTPIN1, DHTTYPE);
+DHT dht2(DHTPIN2, DHTTYPE);
 
-// تعريف الأزرار
-#define BUTTON_1 30
-#define BUTTON_2 31
-#define BUTTON_3 32
-#define BUTTON_4 33
-#define BUTTON_5 34
-#define BUTTON_6 35
-#define BUTTON_7 36
-int buttonPins[] = {BUTTON_1, BUTTON_2, BUTTON_3, BUTTON_4, BUTTON_5, BUTTON_6, BUTTON_7};
-
-// المسافات لكل مشروب
-const int stepsPerDrink[] = {0, 2000, 4000, 6000, 8000, 10000, 12000, 14000};
-int currentPosition = 0;
+int t1, t2, h1, h2, l, w, f;
+int s1, s2, s3, s4, b1, b2;
 
 void setup() {
-  lcd.begin(20, 4);
-  lcd.backlight();
-  lcd.setCursor(0, 0);
-  lcd.print("Select a Drink:");
+  // إعداد شاشة الـ LCD
+  lcd.init();       // تهيئة الشاشة
+  lcd.backlight();  // تشغيل الإضاءة الخلفية
+  SET_LCD_Boot();
 
-  for (int i = 0; i < 7; i++) {
-    pinMode(relayPins[i], OUTPUT);
-    digitalWrite(relayPins[i], HIGH); // الريلاي مطفي بالبداية
-    pinMode(buttonPins[i], INPUT_PULLUP);
-  }
-
-  pinMode(7, OUTPUT); // ENABLE pin for A4988
-  digitalWrite(7, LOW); // تفعيل الموتور
-
-  stepper.setMaxSpeed(1000); // اضبط السرعة
-  stepper.setAcceleration(500); // واضبط التسارع
-}
-
-void moveToDrink(int drinkNumber) {
-  if (drinkNumber < 1 || drinkNumber > 7) return;
-
-  int targetPosition = stepsPerDrink[drinkNumber];
-  stepper.moveTo(targetPosition);
-  
-  while (stepper.distanceToGo() != 0) {
-    stepper.run();
-  }
-
-  delay(300);
-
-  digitalWrite(relayPins[drinkNumber - 1], LOW); // تشغيل الريلاي
-  delay(5000);
-  digitalWrite(relayPins[drinkNumber - 1], HIGH); // إيقاف
-  currentPosition = targetPosition;
+  Serial.begin(115200);
+  Serial.println("System start");
+  UnoSerial.begin(57600); // Serial communication
+  dht1.begin();
+  dht2.begin();
+  pinMode(2,INPUT);
+  pinMode(5,OUTPUT);
+  pinMode(6,OUTPUT);
+  pinMode(7,OUTPUT);
+  pinMode(8,OUTPUT);
+  pinMode(9,OUTPUT);
+  pinMode(10,INPUT);
+  pinMode(13,INPUT);
+  digitalWrite(9,0);
+  digitalWrite(8,1);
 }
 
 void loop() {
-  lcd.setCursor(0, 1);
-  lcd.print("1.Cola 2.Fanta 3.Juice");
-  lcd.setCursor(0, 2);
-  lcd.print("4.Soda 5.Water 6.Tea");
-  lcd.setCursor(0, 3);
-  lcd.print("7.Coffee");
+  h1 = dht1.readHumidity();
+  h2 = dht2.readHumidity();
+  t1 = dht1.readTemperature();
+  t2 = dht2.readTemperature();
+  s1 = analogRead(0);
+  s2 = analogRead(1);
+  s3 = analogRead(2);
+  s4 = analogRead(3);
+  //l = analogRead(4);
+ // w = digitalRead(8);
+  f = digitalRead(2);
+b1=digitalRead(10);
+b2=digitalRead(13);
+  // Mapping sensor values
+  l = map(l, 0, 1023, 1023, 0);
+  s1 = map(s1, 0, 1023, 1023, 0);
+  s2 = map(s2, 0, 1023, 1023, 0);
+  s3 = map(s3, 0, 1023, 1023, 0);
+  s4 = map(s4, 0, 1023, 1023, 0);
 
-  for (int i = 0; i < 7; i++) {
-    if (digitalRead(buttonPins[i]) == LOW) {
-      moveToDrink(i + 1);
-      delay(500);
-    }
-  }
+ if(t1>35||t2>35)
+ {
+  digitalWrite(7,1);
+  digitalWrite(6,0);
+ }
+ 
+ if(t1<28||t2<28)
+ {
+  digitalWrite(6,1);
+  digitalWrite(7,0);
+ }
+
+ if(h1>80||h2>80)
+ {
+  digitalWrite(6,0);
+  digitalWrite(7,0);
+ }
+
+ if(h1<50||h2<50)
+ {
+  digitalWrite(6,1);
+  digitalWrite(7,1);
+ }
+
+ if(f==0)
+ {
+  digitalWrite(9,0);
+  delay(1000);
+  digitalWrite(9,1);
+  delay(1000);
+ }
+
+
+ if(s1<450||s2<450 ||s3<450||s4<450)
+ {
+  digitalWrite(8,0);
+ }
+
+ if(s1>600||s2>600 ||s3>600||s4>600)
+ {
+  digitalWrite(8,1);
+ }
+
+String humidityData = "H1:" + String(h1) + "% H2:" + String(h2) +"% " ;
+String tempData = "T1:" + String(t1) + "C T2:" + String(t2) + "C ";
+
+String soil1 = "S1:" + String(s1) + " S2:" + String(s2) +" " ;
+String soil2 = "S3:" + String(s1) + " S4:" + String(s2) +" " ;
+
+
+if(b1==1)
+ {
+ lcd.clear();
+ lcd.setCursor(0, 0);
+ lcd.print(humidityData);
+ lcd.setCursor(0, 1);
+ lcd.print(tempData);
+ }
+
+if(b2==1)
+ {
+ lcd.clear();
+ lcd.setCursor(0, 0);
+ lcd.print(soil1);
+ lcd.setCursor(0, 1);
+ lcd.print(soil2);
+ }
+
+  
+    UnoSerial.print(t1);
+    UnoSerial.print(" ");
+    UnoSerial.print(h1);
+    UnoSerial.print(" ");
+    UnoSerial.print(t2);
+    UnoSerial.print(" ");
+    UnoSerial.print(h2);
+    UnoSerial.print(" ");
+    UnoSerial.print(s1);
+    UnoSerial.print(" ");
+    UnoSerial.print(s2);
+    UnoSerial.print(" ");
+    UnoSerial.print(s3);
+    UnoSerial.print(" ");
+    UnoSerial.print(s4);
+    UnoSerial.print(" ");
+    UnoSerial.print(w);
+    UnoSerial.print(" ");
+    UnoSerial.print(f);
+    UnoSerial.print(" ");
+    UnoSerial.print(l);
+    UnoSerial.print("\n");
+  
+
+  // عرض البيانات على شاشة LCD
+ 
+
+  Serial.print("H1: "); Serial.println(h1);
+  Serial.print("H2: "); Serial.println(h2);
+  Serial.print("T1: "); Serial.println(t1);
+  Serial.print("T2: "); Serial.println(t2);
+  Serial.print("S1: "); Serial.println(s1);
+  Serial.print("S2: "); Serial.println(s2);
+  Serial.print("S3: "); Serial.println(s3);
+  Serial.print("S4: "); Serial.println(s4);
+  Serial.print("L: "); Serial.println(l);
+ 
+
+  delay(250); // انتظر قليلاً قبل التحديث التالي
+}
+
+void SET_LCD_Boot() {
+  lcd.setCursor(0, 0);
+  lcd.print(" WELCOME to ");
+  lcd.setCursor(0, 1);
+  lcd.print(" PROJECT ");
+  delay(2000);
+  lcd.setCursor(0, 1);
+  lcd.print("lena's team ");
+  delay(1200);
+  lcd.print(".");
+  delay(500);
+  lcd.print(".");
+  delay(500);
+  lcd.print(".");
+  delay(500);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("1- temp&hum");
+  lcd.setCursor(0, 1);
+  lcd.print("2- soil");
 }
